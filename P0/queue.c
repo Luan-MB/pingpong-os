@@ -40,17 +40,17 @@ void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
 int queue_append (queue_t **queue, queue_t *elem) {
 
     if (!queue) {
-        perror("### A fila nao existe ###\n");
+        perror("### A fila nao existe ###");
         return 1;
     }
     
     if (!elem) {
-        perror("### O elemento nao existe ###\n");
+        perror("### O elemento nao existe ###");
         return 1;
     }
     
     if (elem->next || elem->prev) {
-        perror("### O elemento esta em uma fila ###\n");
+        perror("### O elemento esta em uma fila ###");
         return 1;
     }
     
@@ -76,20 +76,25 @@ int queue_append (queue_t **queue, queue_t *elem) {
 int queue_remove (queue_t **queue, queue_t *elem) {
 
     if (!queue) {
-        perror("### A fila nao existe ###\n");
+        perror("### A fila nao existe ###");
         return 1;
     }
 
     if (!(*queue)) {
-        perror("### A fila esta vazia ###\n");
+        perror("### A fila esta vazia ###");
         return 1;
     }
     
     if (!elem) {
-        perror("### O elemento nao existe ###\n");
+        perror("### O elemento nao existe ###");
         return 1;
     }
     
+    if (!(elem->prev) || !(elem->next)) {
+        perror("### O elemento nao pertence a nenhuma fila ###");
+        return 1;
+    }
+
     if (elem == *queue) { // Caso de elem ser o primeiro elemento da lista
         
         if (*queue == (*queue)->next) { // Caso de elem ser o unico elemento da lista
@@ -115,6 +120,6 @@ int queue_remove (queue_t **queue, queue_t *elem) {
         }
     }
 
-    perror("### O elemento nao esta na fila ###\n");
+    perror("### O elemento nao esta na fila ###");
     return 1;
 }
