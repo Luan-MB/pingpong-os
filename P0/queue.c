@@ -91,7 +91,7 @@ int queue_remove (queue_t **queue, queue_t *elem) {
     }
     
     if (!(elem->prev) || !(elem->next)) {
-        perror("### O elemento nao pertence a nanhuma fila ###");
+        perror("### O elemento nao pertence a nenhuma fila ###");
         return 1;
     }
 
