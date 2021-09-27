@@ -20,7 +20,7 @@ void ppos_init () {
 
     mainTask.next = mainTask.prev = NULL;
     mainTask.id = task_Id;
-    mainTask.status = 'R';
+    mainTask.status = 'E';
     
     currentTask = &mainTask;
 
@@ -68,13 +68,18 @@ int task_switch (task_t *task) {
 
     if (!task)
         return -1;
+
+    prevTask = currentTask; // Tarefa anterior recebe a tarefa atual
+    currentTask = task;     // Tarefa atual recebe task
     
+    if (prevTask->status != 'T') // Se prevTask nao tiver terminado ('T')
+        prevTask->status = 'R';  // Troca-se status para pronta ('R')
+    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
+
     #ifdef DEBUG
-        printf ("task_switch: trocando contexto %d -> %d\n", currentTask->id, task->id);
+        printf ("task_switch: trocando contexto %d(%c) -> %d(%c)\n", prevTask->id, prevTask->status, 
+        currentTask->id, currentTask->status);
     #endif
-    
-    prevTask = currentTask;
-    currentTask = task;
 
     swapcontext(&prevTask->context,&task->context);
 
