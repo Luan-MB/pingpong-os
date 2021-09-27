@@ -7,11 +7,12 @@
 
 #define STACKSIZE 64*1024
 
-task_t *currentTask, *prevTask, mainTask, dispatcherTask, *taskQueue;
+task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int task_Id = 0, readyTasks = -1;
 
 static void dispatcher ();
 
+// Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init () {
 
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
@@ -26,6 +27,7 @@ void ppos_init () {
     task_create(&dispatcherTask, dispatcher, NULL);
 }
 
+// Cria uma nova tarefa. Retorna um ID> 0 ou erro
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
     char *stack;
@@ -61,6 +63,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     return task_Id;
 }
 
+// Alterna a execução para a tarefa indicada
 int task_switch (task_t *task) {
 
     if (!task)
@@ -78,6 +81,7 @@ int task_switch (task_t *task) {
     return 0;
 }
 
+// Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit (int exitCode) {
 
     currentTask->status = 'T';
@@ -92,14 +96,17 @@ void task_exit (int exitCode) {
         task_switch(&mainTask);
 }
 
+// Retorna o identificador da tarefa corrente (main deve ser 0)
 int task_id () {
 
     return currentTask->id;
 }
 
+// Libera o processador para a próxima tarefa, retornando à fila de tarefas
+// prontas ("ready queue")
 void task_yield () {
 
-    if (currentTask->id != 0) {
+    if (currentTask->id != 0) { 
         queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);
         queue_append((queue_t **) &taskQueue, (queue_t *) currentTask);
     }
@@ -107,11 +114,14 @@ void task_yield () {
     task_switch(&dispatcherTask);
 }
 
+// Funcao que retorna a proxima tarefa a ser executada
 static task_t *scheduler () {
 
     return taskQueue->next;
 }
 
+// Funcao executada na dispatcherTask, responsavel por alternar a execucao
+// entre as tarefas prontas
 static void dispatcher () {
 
     task_t *nextTask;
@@ -121,9 +131,8 @@ static void dispatcher () {
         nextTask = scheduler();
     
         task_switch(nextTask);
-        // printf("Prev: %d, Current: %d, Next: %d\n",prevTask->id,currentTask->id,nextTask->id);
 
-        if (prevTask->status == 'T') {
+        if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
             
             queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
             free(prevTask->context.uc_stack.ss_sp);
