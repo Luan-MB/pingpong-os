@@ -7,8 +7,9 @@
 
 #define STACKSIZE 64*1024
 
-task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int task_Id = 0, readyTasks = -1;
+task_t *currentTask, *prevTask, *readyQueue,  mainTask, dispatcherTask;
+int task_Id = 0;
+int readyTasks = -1; // Comeca com -1 pois dispatcher nao deve contar como tarefa a ser executada
 
 static void dispatcher ();
 
@@ -51,12 +52,12 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->id = ++task_Id;
     task->status = 'R';
 
-    queue_append((queue_t **) &taskQueue, (queue_t *) task);
+    queue_append((queue_t **) &readyQueue, (queue_t *) task);
     readyTasks++;
     
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
-        printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
+        printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) readyQueue));
         printf ("numero de tarefas prontas %d\n", readyTasks);
     #endif
 
@@ -111,9 +112,9 @@ int task_id () {
 // prontas ("ready queue")
 void task_yield () {
 
-    if (currentTask->id != 0) { 
-        queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);
-        queue_append((queue_t **) &taskQueue, (queue_t *) currentTask);
+    if (currentTask->id != 0) { // Coloca a tarefa que estava sendo executada no fim da fila
+        queue_remove((queue_t **) &readyQueue, (queue_t *) currentTask);
+        queue_append((queue_t **) &readyQueue, (queue_t *) currentTask);
     }
     
     task_switch(&dispatcherTask);
@@ -122,7 +123,9 @@ void task_yield () {
 // Funcao que retorna a proxima tarefa a ser executada
 static task_t *scheduler () {
 
-    return taskQueue->next;
+    // Como nao ha prioridade e a ultima tarefa executada foi para o fim
+    // a proxima a ser executada esta sempre na posicao next de readyQueue
+    return readyQueue->next;
 }
 
 // Funcao executada na dispatcherTask, responsavel por alternar a execucao
@@ -133,17 +136,18 @@ static void dispatcher () {
 
     while (readyTasks > 0) {
         
+        // Recebe a proxima tarefa a ser executada
         nextTask = scheduler();
     
         task_switch(nextTask);
 
         if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
             
-            queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
+            queue_remove((queue_t **) &readyQueue, (queue_t *) prevTask);
             free(prevTask->context.uc_stack.ss_sp);
             readyTasks--;
             #ifdef DEBUG
-                printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
+                printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) readyQueue));
                 printf ("numero de tarefas prontas %d\n", readyTasks);
             #endif
         }
