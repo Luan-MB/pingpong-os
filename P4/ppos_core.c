@@ -7,7 +7,7 @@
 
 #define STACKSIZE 64*1024
 
-#define TA_ALFA -1
+#define TA_ALFA -1 // Fator de aging
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int task_Id = 0, readyTasks = -1;
@@ -61,7 +61,6 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
         printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
-        printf ("numero de tarefas prontas %d\n", readyTasks);
     #endif
 
     return task_Id;
@@ -154,7 +153,7 @@ static task_t *scheduler () {
 
     while ((task = task->next) != &dispatcherTask) {
         if (task != lowestPrio)
-            task->pDinamica += TA_ALFA;
+            task->pDinamica += TA_ALFA; // Task aging
     }
     
     return lowestPrio; 
@@ -170,17 +169,19 @@ static void dispatcher () {
         
         nextTask = scheduler();
     
-        task_switch(nextTask);
-
-        if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
+        if (nextTask) {
             
-            queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
-            free(prevTask->context.uc_stack.ss_sp);
-            readyTasks--;
-            #ifdef DEBUG
-                printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
-                printf ("numero de tarefas prontas %d\n", readyTasks);
-            #endif
+            task_switch(nextTask);
+
+            if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
+                
+                queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
+                free(prevTask->context.uc_stack.ss_sp);
+                readyTasks--;
+                #ifdef DEBUG
+                    printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
+                #endif
+            }
         }
     }
     
