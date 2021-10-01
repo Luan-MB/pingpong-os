@@ -19,6 +19,7 @@ typedef struct task_t
     char status;                    // R -> ready, E -> executando, T -> terminada
     int pDinamica, pEstatica;       // prioridades dinamica e estatica da tarefa
     unsigned int eTime, pTime;      // tempos de execucao e processamento
+    unsigned int tActivations;      // numero de ativacoes da tarefa
    // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

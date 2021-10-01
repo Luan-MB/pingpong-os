@@ -16,7 +16,7 @@
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int task_Id = 0, taskTime;
-unsigned int clock = 0;
+unsigned int clock = 0, activationTime;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -40,6 +40,7 @@ void ppos_init () {
     mainTask.status = 'E';
     mainTask.pDinamica = mainTask.pEstatica = 0;
     mainTask.eTime = systime ();
+    mainTask.pTime = 0;
     
     currentTask = &mainTask;
 
@@ -69,11 +70,14 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
     makecontext (&task->context, (void *)(*start_func), 1, arg);
     
-    task->next = task->prev = NULL;
+    // Atribuicoes iniciais
+    task->next = task->prev = NULL;         
     task->id = ++task_Id;
     task->status = 'R';
     task->pEstatica = task->pDinamica = 0;
     task->eTime = systime ();
+    task->pTime = 0;
+    task->tActivations = 0;
 
     if (task != &dispatcherTask) // Se nao for a tarefa dispatcher 
         queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
@@ -95,6 +99,10 @@ int task_switch (task_t *task) {
     prevTask = currentTask; // Tarefa anterior recebe a tarefa atual
     currentTask = task;     // Tarefa atual recebe task
 
+    if (prevTask->status != 'T') // Se prevTask nao tiver terminado ('T')
+        prevTask->status = 'R';  // Troca-se status para pronta ('R')
+    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
+
     #ifdef DEBUG
         printf ("task_switch: trocando contexto %d(%c) -> %d(%c)\n", prevTask->id, prevTask->status, 
         currentTask->id, currentTask->status);
@@ -110,7 +118,7 @@ void task_exit (int exitCode) {
 
     currentTask->status = 'T';
     currentTask->eTime = (systime () - currentTask->eTime);
-    printf("task %d exit: Execution time: %d\n",currentTask->id,currentTask->eTime);
+    printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->tActivations);
     
     #ifdef DEBUG
         printf ("task_exit: tarefa %d sendo encerrada\n", currentTask->id);
@@ -186,11 +194,13 @@ static void dispatcher () {
     task_t *nextTask;
 
     while (1) { // While (1) necessario para que dispatcher funcione apos task_exit (se task_yield chamada denovo)
+        
         while ((nextTask = scheduler ())) { // Enquanto existirem tarefas a serem executadas
             
-            currentTask->status = 'R';  // Troca-se status para pronta ('R')
-            nextTask->status = 'E';   // Troca-se o status de next task para executando ('E')
+            dispatcherTask.tActivations++;
+            nextTask->tActivations++;
             taskTime = QUANTUM;
+    
             task_switch(nextTask);
 
             if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
@@ -221,9 +231,9 @@ static void set_timer () {
 
     // ajusta valores do taskTime
     timer.it_value.tv_usec = 1000 ;      // primeiro disparo, em micro-segundos
-    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+    timer.it_value.tv_sec  = 0 ;         // primeiro disparo, em segundos
     timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
-    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+    timer.it_interval.tv_sec  = 0 ;      // disparos subsequentes, em segundos
 
     // arma o taskTime ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
@@ -237,13 +247,12 @@ static void set_timer () {
 static void tratador () {
 
     clock++;
-    
+    currentTask->pTime++;
     if (currentTask == &dispatcherTask)
         return;
     taskTime--;
     if (taskTime == 0)
         task_yield();
-    
 }
 
 unsigned int systime () {
