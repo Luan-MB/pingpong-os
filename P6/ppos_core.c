@@ -12,11 +12,11 @@
 #define TA_ALFA -1   // Fator de aging
 #define MAX_PRIO -20 // Maior prioridade
 #define MIN_PRIO 20  // Menor prioridade
-#define QUANTUM 10  // Ticks por quantum
+#define QUANTUM 10   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int task_Id = 0, taskTime;
-unsigned int clock = 0, activationTime;
+int g_taskId = 0, g_taskTime;
+unsigned int g_clock = 0, g_taskActivTime;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -36,18 +36,19 @@ void ppos_init () {
     setvbuf (stdout, 0, _IONBF, 0);
 
     mainTask.next = mainTask.prev = NULL;
-    mainTask.id = task_Id;
+    mainTask.id = g_taskId++;
     mainTask.status = 'E';
     mainTask.pDinamica = mainTask.pEstatica = 0;
+    mainTask.taskType = 1;
     mainTask.eTime = systime ();
     mainTask.pTime = 0;
     
     currentTask = &mainTask;
 
     task_create(&dispatcherTask, dispatcher, NULL);
+    dispatcherTask.taskType = 0;
 
     set_timer();
-    //taskTime = QUANTUM; // Nao sei se precisa
 }
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro
@@ -72,9 +73,10 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     
     // Atribuicoes iniciais
     task->next = task->prev = NULL;         
-    task->id = ++task_Id;
+    task->id = g_taskId++;
     task->status = 'R';
     task->pEstatica = task->pDinamica = 0;
+    task->taskType = 1;
     task->eTime = systime ();
     task->pTime = 0;
     task->tActivations = 0;
@@ -87,7 +89,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
         printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
     #endif
 
-    return task_Id;
+    return g_taskId;
 }
 
 // Alterna a execução para a tarefa indicada
@@ -97,11 +99,16 @@ int task_switch (task_t *task) {
         return -1;
 
     prevTask = currentTask; // Tarefa anterior recebe a tarefa atual
-    currentTask = task;     // Tarefa atual recebe task
+    
+    currentTask = task; // Tarefa atual recebe task
 
-    if (prevTask->status != 'T') // Se prevTask nao tiver terminado ('T')
-        prevTask->status = 'R';  // Troca-se status para pronta ('R')
+    if (prevTask->status != 'T') { // Se prevTask nao tiver terminado ('T')
+        prevTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa substituida 
+        prevTask->status = 'R'; // Troca-se status para pronta ('R')
+    }
     currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
+    
+    g_taskActivTime = systime (); // Salva o tempo de ativacao da tarefa
 
     #ifdef DEBUG
         printf ("task_switch: trocando contexto %d(%c) -> %d(%c)\n", prevTask->id, prevTask->status, 
@@ -116,8 +123,9 @@ int task_switch (task_t *task) {
 // Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit (int exitCode) {
 
-    currentTask->status = 'T';
-    currentTask->eTime = (systime () - currentTask->eTime);
+    currentTask->status = 'T'; // Status da tarefa terminada
+    currentTask->eTime = (systime () - currentTask->eTime); // Calcula o tempo de execucao da tarefa
+    currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
     printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->tActivations);
     
     #ifdef DEBUG
@@ -199,7 +207,7 @@ static void dispatcher () {
             
             dispatcherTask.tActivations++;
             nextTask->tActivations++;
-            taskTime = QUANTUM;
+            g_taskTime = QUANTUM;
     
             task_switch(nextTask);
 
@@ -229,13 +237,13 @@ static void set_timer () {
       exit (1) ;
     }
 
-    // ajusta valores do taskTime
+    // ajusta valores do g_taskTime
     timer.it_value.tv_usec = 1000 ;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0 ;         // primeiro disparo, em segundos
     timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
     timer.it_interval.tv_sec  = 0 ;      // disparos subsequentes, em segundos
 
-    // arma o taskTime ITIMER_REAL (vide man setitimer)
+    // arma o g_taskTime ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
     {
       perror ("Erro em setitimer: ") ;
@@ -246,16 +254,15 @@ static void set_timer () {
 // Funcao que trata os ticks do timer
 static void tratador () {
 
-    clock++;
-    currentTask->pTime++;
-    if (currentTask == &dispatcherTask)
+    g_clock++;
+    if (currentTask->taskType == 0)
         return;
-    taskTime--;
-    if (taskTime == 0)
+    g_taskTime--;
+    if (g_taskTime == 0)
         task_yield();
 }
 
 unsigned int systime () {
 
-    return clock;
+    return g_clock;
 }
