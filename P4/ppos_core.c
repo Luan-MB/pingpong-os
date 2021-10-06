@@ -12,7 +12,7 @@
 #define MIN_PRIO 20  // Menor prioridade
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int task_Id = 0;
+int task_Id = 0, userTasks = 0;
 
 static void dispatcher ();
 
@@ -57,9 +57,10 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->status = 'R';
     task->pEstatica = task->pDinamica = 0;
 
-    if (task != &dispatcherTask) // Se nao for a tarefa dispatcher 
+    if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
         queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
-    
+        userTasks++;
+    }
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
         printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
@@ -169,17 +170,21 @@ static void dispatcher () {
 
     task_t *nextTask;
 
-    while ((nextTask = scheduler ()) != NULL) { // Enquanto existirem tarefas a serem executadas
+    while (userTasks > 0) { // Enquanto existirem tarefas a serem executadas
             
-        task_switch(nextTask);
+        if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
+        
+            task_switch(nextTask);
 
-        if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
-                
-            queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
-            free(prevTask->context.uc_stack.ss_sp);
-            #ifdef DEBUG
-                printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
-            #endif
+            if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
+                    
+                queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
+                free(prevTask->context.uc_stack.ss_sp);
+                userTasks--;
+                #ifdef DEBUG
+                    printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
+                #endif
+            }
         }
     }
     
