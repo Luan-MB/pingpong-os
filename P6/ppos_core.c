@@ -15,7 +15,7 @@
 #define QUANTUM 10   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int g_taskId = 0, g_taskTime;
+int g_taskId = 0, g_userTasks = 0, g_taskTime;
 unsigned int g_clock = 0, g_taskActivTime;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
@@ -24,16 +24,18 @@ struct sigaction action ;
 // estrutura de inicialização to timer
 struct itimerval timer ;
 
-static void dispatcher ();
-static void set_timer ();
-static void tratador ();
-unsigned int systime ();
+static void dispatcher (); // Funcao dispatcher
+static void set_timer ();  // Funcao que inicia o timer
+static void tratador ();   // Funcao que trata os ticks do timer
+unsigned int systime ();   // Funcao que retorna o numeros de ticks desde o inicio de timer
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init () {
 
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
     setvbuf (stdout, 0, _IONBF, 0);
+
+    getcontext(&mainTask.context);
 
     mainTask.next = mainTask.prev = NULL;
     mainTask.id = g_taskId++;
@@ -46,7 +48,7 @@ void ppos_init () {
     currentTask = &mainTask;
 
     task_create(&dispatcherTask, dispatcher, NULL);
-    dispatcherTask.taskType = 0;
+    dispatcherTask.taskType = SYSTEM;
 
     set_timer();
 }
@@ -76,14 +78,15 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->id = g_taskId++;
     task->status = 'R';
     task->pEstatica = task->pDinamica = 0;
-    task->taskType = 1;
+    task->taskType = USER;
     task->eTime = systime ();
     task->pTime = 0;
-    task->tActivations = 0;
+    task->activations = 0;
 
-    if (task != &dispatcherTask) // Se nao for a tarefa dispatcher 
+    if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
         queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
-    
+        g_userTasks++;
+    }
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
         printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
@@ -126,7 +129,7 @@ void task_exit (int exitCode) {
     currentTask->status = 'T'; // Status da tarefa terminada
     currentTask->eTime = (systime () - currentTask->eTime); // Calcula o tempo de execucao da tarefa
     currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
-    printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->tActivations);
+    printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->activations);
     
     #ifdef DEBUG
         printf ("task_exit: tarefa %d sendo encerrada\n", currentTask->id);
@@ -201,12 +204,11 @@ static void dispatcher () {
 
     task_t *nextTask;
 
-    while (1) { // While (1) necessario para que dispatcher funcione apos task_exit (se task_yield chamada denovo)
-        
-        while ((nextTask = scheduler ())) { // Enquanto existirem tarefas a serem executadas
+    while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
+        if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
             
-            dispatcherTask.tActivations++;
-            nextTask->tActivations++;
+            dispatcherTask.activations++;
+            nextTask->activations++;
             g_taskTime = QUANTUM;
     
             task_switch(nextTask);
@@ -215,14 +217,16 @@ static void dispatcher () {
                     
                 queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
                 free(prevTask->context.uc_stack.ss_sp);
+                g_userTasks--;
                 #ifdef DEBUG
                     printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
                 #endif
             }
         }
         
-        task_exit(0); // Devolve o processador a main
     }
+    
+    task_exit(0); // Devolve o processador a main
 }
 
 static void set_timer () {
@@ -255,7 +259,7 @@ static void set_timer () {
 static void tratador () {
 
     g_clock++;
-    if (currentTask->taskType == 0)
+    if (currentTask->taskType == SYSTEM)
         return;
     g_taskTime--;
     if (g_taskTime == 0)
