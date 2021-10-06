@@ -12,7 +12,7 @@
 #define MIN_PRIO 20  // Menor prioridade
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int task_Id = 0, userTasks = 0;
+int g_taskId = 0, g_userTasks = 0;
 
 static void dispatcher ();
 
@@ -23,7 +23,7 @@ void ppos_init () {
     setvbuf (stdout, 0, _IONBF, 0);
 
     mainTask.next = mainTask.prev = NULL;
-    mainTask.id = task_Id;
+    mainTask.id = g_taskId;
     mainTask.status = 'E';
     mainTask.pDinamica = mainTask.pEstatica = 0;
     
@@ -53,20 +53,20 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     makecontext (&task->context, (void *)(*start_func), 1, arg);
     
     task->next = task->prev = NULL;
-    task->id = ++task_Id;
+    task->id = ++g_taskId;
     task->status = 'R';
     task->pEstatica = task->pDinamica = 0;
 
     if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
         queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
-        userTasks++;
+        g_userTasks++;
     }
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
         printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
     #endif
 
-    return task_Id;
+    return g_taskId;
 }
 
 // Alterna a execução para a tarefa indicada
@@ -170,7 +170,7 @@ static void dispatcher () {
 
     task_t *nextTask;
 
-    while (userTasks > 0) { // Enquanto existirem tarefas a serem executadas
+    while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
             
         if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
         
@@ -180,7 +180,7 @@ static void dispatcher () {
                     
                 queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
                 free(prevTask->context.uc_stack.ss_sp);
-                userTasks--;
+                g_userTasks--;
                 #ifdef DEBUG
                     printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
                 #endif
