@@ -41,7 +41,7 @@ void ppos_init () {
     mainTask.id = g_taskId++;
     mainTask.status = 'E';
     mainTask.pDinamica = mainTask.pEstatica = 0;
-    mainTask.taskType = 1;
+    mainTask.taskType = USER;
     mainTask.eTime = systime ();
     mainTask.pTime = 0;
     
@@ -105,19 +105,19 @@ int task_switch (task_t *task) {
     
     currentTask = task; // Tarefa atual recebe task
 
-    if (prevTask->status != 'T') { // Se prevTask nao tiver terminado ('T')
-        prevTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa substituida 
-        prevTask->status = 'R'; // Troca-se status para pronta ('R')
-    }
-    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
-    
-    g_taskActivTime = systime (); // Salva o tempo de ativacao da tarefa
-
     #ifdef DEBUG
         printf ("task_switch: trocando contexto %d(%c) -> %d(%c)\n", prevTask->id, prevTask->status, 
         currentTask->id, currentTask->status);
     #endif
     
+    if (prevTask->status == 'E') { // Se a tarefa anterior nao tiver terminado
+        prevTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa substituida 
+        prevTask->status = 'R'; // Troca-se status para pronta ('R')
+    }
+    currentTask->status = 'E'; // Troca-se o status de current task para executando ('E')
+    
+    g_taskActivTime = systime (); // Salva o tempo de ativacao da tarefa
+
     swapcontext(&prevTask->context,&task->context);
 
     return 0;
