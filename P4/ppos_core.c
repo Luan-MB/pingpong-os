@@ -78,14 +78,14 @@ int task_switch (task_t *task) {
     prevTask = currentTask; // Tarefa anterior recebe a tarefa atual
     currentTask = task;     // Tarefa atual recebe task
     
-    if (prevTask->status != 'T') // Se prevTask nao tiver terminado ('T')
-        prevTask->status = 'R';  // Troca-se status para pronta ('R')
-    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
-
-    #ifdef DEBUG
+     #ifdef DEBUG
         printf ("task_switch: trocando contexto %d(%c) -> %d(%c)\n", prevTask->id, prevTask->status, 
         currentTask->id, currentTask->status);
     #endif
+    
+    if (prevTask->status == 'E') // Se a tarefa anterior nao terminou
+        prevTask->status = 'R';  // Troca-se status para pronta ('R')
+    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
 
     swapcontext(&prevTask->context,&task->context);
 
