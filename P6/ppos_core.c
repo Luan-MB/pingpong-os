@@ -148,6 +148,7 @@ int task_id () {
 // prontas ("ready queue")
 void task_yield () {
 
+    dispatcherTask.activations++;
     task_switch(&dispatcherTask);
 }
 
@@ -202,7 +203,6 @@ static void dispatcher () {
     task_t *nextTask;
 
     while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
-        dispatcherTask.activations++;
         if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
         
             nextTask->activations++;

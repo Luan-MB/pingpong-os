@@ -12,7 +12,7 @@
 #define TA_ALFA -1   // Fator de aging
 #define MAX_PRIO -20 // Maior prioridade
 #define MIN_PRIO 20  // Menor prioridade
-#define QUANTUM 20   // Ticks por quantum
+#define QUANTUM 10   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
@@ -40,7 +40,7 @@ void ppos_init () {
     // Inicializacoes dda tarefa main
     mainTask.next = mainTask.prev = NULL;
     mainTask.id = g_taskId++;
-    mainTask.status = 'E';
+    mainTask.status = 'R';
     mainTask.pDinamica = mainTask.pEstatica = 0;
     mainTask.taskType = 1;
     mainTask.eTime = systime ();
@@ -115,11 +115,8 @@ int task_switch (task_t *task) {
     
     currentTask = task; // Tarefa atual recebe task
 
-    if (prevTask->status != 'T') { // Se prevTask nao tiver terminado ('T')
+    if (prevTask->status != 'T') // Se prevTask nao tiver terminado ('T')
         prevTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa substituida 
-        prevTask->status = 'R'; // Troca-se status para pronta ('R')
-    }
-    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
     
     g_taskActivTime = systime (); // Salva o tempo de ativacao da tarefa
 
@@ -168,6 +165,7 @@ int task_id () {
 // prontas ("ready queue")
 void task_yield () {
 
+    dispatcherTask.activations++;
     task_switch(&dispatcherTask);
 }
 
@@ -201,7 +199,6 @@ int task_join (task_t *task) {
     queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask); // Retira a tarefa da fila de prontas
     queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask); // Insere a tarefa na fila de espera de task
     task_yield();
-    currentTask->status = 'R';
     return task->exitCode;
 }
 
@@ -237,7 +234,6 @@ static void dispatcher () {
     while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
         if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
             
-            dispatcherTask.activations++;
             nextTask->activations++;
             g_taskTime = QUANTUM;
     
