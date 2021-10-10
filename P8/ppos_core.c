@@ -93,7 +93,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->activations = 0;
     task->joinQueue = NULL;
 
-    if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
+    if (task != &dispatcherTask) { // Se nao for a tarefa dispatcher 
         queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
         g_userTasks++;
     }
@@ -146,8 +146,8 @@ void task_exit (int exitCode) {
     currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
     printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->activations);
 
-    while (queue_size(currentTask->joinQueue) > 0) {
-        queue_t *aux = currentTask->joinQueue;
+    queue_t *aux;
+    while ((aux = currentTask->joinQueue)) { // Enquanto houver tarefas na fila de espera
         queue_remove((queue_t **) &currentTask->joinQueue, aux);
         queue_append((queue_t **) &taskQueue, aux);
     }
@@ -195,11 +195,11 @@ int task_getprio (task_t *task) {
 // A tarefa corrente aguarda o encerramento de outra task
 int task_join (task_t *task) {
 
-    if (!task || task->status == 'T')
+    if (!task || task->status == 'T') // Se task nao existir o utiver terminado
         return -1;
-    currentTask->status = 'W';
-    queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);
-    queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask);
+    currentTask->status = 'W'; // Troca-se o status de currentTask para esperando ('W')
+    queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask); // Retira a tarefa da fila de prontas
+    queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask); // Insere a tarefa na fila de espera de task
     task_yield();
     currentTask->status = 'R';
     return task->exitCode;
@@ -289,7 +289,7 @@ static void set_timer () {
 static void tratador () {
 
     g_clock++;
-    if (currentTask->taskType == SYSTEM)
+    if (currentTask->taskType == SYSTEM) // Tarefas de sistema nao devem ser preemptadas
         return;
     g_taskTime--;
     if (g_taskTime == 0)

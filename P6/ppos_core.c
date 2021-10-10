@@ -39,7 +39,7 @@ void ppos_init () {
 
     mainTask.next = mainTask.prev = NULL;
     mainTask.id = g_taskId++;
-    mainTask.status = 'E';
+    mainTask.status = 'R';
     mainTask.pDinamica = mainTask.pEstatica = 0;
     mainTask.taskType = USER;
     mainTask.eTime = systime ();
@@ -110,12 +110,9 @@ int task_switch (task_t *task) {
         currentTask->id, currentTask->status);
     #endif
     
-    if (prevTask->status == 'E') { // Se a tarefa anterior nao tiver terminado
+    if (prevTask->status != 'T') // Se a tarefa anterior nao tiver terminado
         prevTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa substituida 
-        prevTask->status = 'R'; // Troca-se status para pronta ('R')
-    }
-    currentTask->status = 'E'; // Troca-se o status de current task para executando ('E')
-    
+
     g_taskActivTime = systime (); // Salva o tempo de ativacao da tarefa
 
     swapcontext(&prevTask->context,&task->context);
@@ -205,16 +202,16 @@ static void dispatcher () {
     task_t *nextTask;
 
     while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
+        dispatcherTask.activations++;
         if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
-            
-            dispatcherTask.activations++;
+        
             nextTask->activations++;
             g_taskTime = QUANTUM;
     
             task_switch(nextTask);
 
             if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
-                    
+          
                 queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
                 free(prevTask->context.uc_stack.ss_sp);
                 g_userTasks--;
@@ -222,10 +219,10 @@ static void dispatcher () {
                     printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
                 #endif
             }
-        }
         
-    }
+        }
     
+    }
     task_exit(0); // Devolve o processador a main
 }
 

@@ -24,7 +24,7 @@ void ppos_init () {
 
     mainTask.next = mainTask.prev = NULL;
     mainTask.id = g_taskId;
-    mainTask.status = 'E';
+    mainTask.status = 'R';
     mainTask.pDinamica = mainTask.pEstatica = 0;
     
     currentTask = &mainTask;
@@ -83,10 +83,6 @@ int task_switch (task_t *task) {
         currentTask->id, currentTask->status);
     #endif
     
-    if (prevTask->status == 'E') // Se a tarefa anterior nao terminou
-        prevTask->status = 'R';  // Troca-se status para pronta ('R')
-    currentTask->status = 'E';   // Troca-se o status de current task para executando ('E')
-
     swapcontext(&prevTask->context,&task->context);
 
     return 0;
