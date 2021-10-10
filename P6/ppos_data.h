@@ -18,7 +18,7 @@ typedef struct task_t
     struct task_t *prev, *next;		  // ponteiros para usar em filas
     int id;				                  // identificador da tarefa
     ucontext_t context;			        // contexto armazenado da tarefa
-    char status;                    // R -> ready, E -> executando, T -> terminada
+    char status;                    // R -> ready, T -> terminada
     int pDinamica, pEstatica;       // prioridades dinamica e estatica da tarefa
     type taskType;                  // tipos de tarefa SYSTEM -> Sistema, USER -> Usuario
     unsigned int eTime, pTime;      // tempos de execucao e processamento

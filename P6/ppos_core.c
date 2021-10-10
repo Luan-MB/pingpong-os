@@ -16,7 +16,7 @@
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
-unsigned int g_clock = 0, g_taskActivTime;
+unsigned int g_clock = 0, g_taskActivTime = 0;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -238,13 +238,13 @@ static void set_timer () {
       exit (1) ;
     }
 
-    // ajusta valores do g_taskTime
+    // ajusta valores do timer
     timer.it_value.tv_usec = 1000 ;      // primeiro disparo, em micro-segundos
     timer.it_value.tv_sec  = 0 ;         // primeiro disparo, em segundos
     timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
     timer.it_interval.tv_sec  = 0 ;      // disparos subsequentes, em segundos
 
-    // arma o g_taskTime ITIMER_REAL (vide man setitimer)
+    // arma o timer ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
     {
       perror ("Erro em setitimer: ") ;
