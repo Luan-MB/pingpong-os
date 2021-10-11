@@ -39,7 +39,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
     getcontext(&task->context);
 
-    stack = malloc (STACKSIZE);
+    stack = malloc (STACKSIZE); // Inicializacao do tipo context
     if (stack) {
         task->context.uc_stack.ss_sp = stack;
         task->context.uc_stack.ss_size = STACKSIZE;
@@ -91,7 +91,7 @@ int task_switch (task_t *task) {
 // Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit (int exitCode) {
 
-    currentTask->status = 'T';
+    currentTask->status = 'T'; // Muda o status da tarefa atual para terminada
     
     #ifdef DEBUG
         printf ("task_exit: tarefa %d sendo encerrada\n", currentTask->id);
