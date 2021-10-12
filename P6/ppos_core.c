@@ -56,6 +56,8 @@ void ppos_init () {
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
+    getcontext(&task->context);
+    
     char *stack = malloc (STACKSIZE); // Inicialização tipo context
     if (stack) {
         task->context.uc_stack.ss_sp = stack;
@@ -67,8 +69,6 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
         return -1;
     }
     
-    getcontext(&task->context);
-
     makecontext (&task->context, (void *)(*start_func), 1, arg);
     
     // Atribuicoes iniciais
@@ -81,7 +81,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->pTime = 0;
     task->activations = 0;
 
-    if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
+    if (task != &dispatcherTask) { // Se nao for a tarefa dispatcher 
         if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca-se na fila de tarefas
             fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", g_taskId);
         else

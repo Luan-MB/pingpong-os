@@ -39,6 +39,8 @@ void ppos_init () {
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
+    getcontext(&task->context);
+     
     char *stack = malloc (STACKSIZE); // Inicializacao do tipo context
     if (stack) {
         task->context.uc_stack.ss_sp = stack;
@@ -49,8 +51,6 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
         perror ("Erro na criação da pilha: ");
         return -1;
     }
-
-    getcontext(&task->context);
     
     makecontext (&task->context, (void *)(*start_func), 1, arg);
     

@@ -48,9 +48,12 @@ void ppos_init () {
     mainTask.joinQueue = NULL;
     
     // Insere na fila de tarefas prontas
-    queue_append((queue_t **) &taskQueue, (queue_t *) &mainTask);
-    g_userTasks++;
-
+    if (queue_append((queue_t **) &taskQueue, (queue_t *) &mainTask) == 1) { // Se der erro aborta-se o programa
+        fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", mainTask.id);
+        exit(1);
+    }
+    else
+        g_userTasks++;
     currentTask = &mainTask;
 
     // Cria a tarefa dispatcher
@@ -65,11 +68,9 @@ void ppos_init () {
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
-    char *stack;
-
     getcontext(&task->context);
 
-    stack = malloc (STACKSIZE);
+    char *stack = malloc (STACKSIZE);
     if (stack) {
         task->context.uc_stack.ss_sp = stack;
         task->context.uc_stack.ss_size = STACKSIZE;
@@ -94,8 +95,10 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->joinQueue = NULL;
 
     if (task != &dispatcherTask) { // Se nao for a tarefa dispatcher 
-        queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
-        g_userTasks++;
+        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca-se na fila de tarefas
+            fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", task->id);
+        else
+            g_userTasks++;
     }
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
