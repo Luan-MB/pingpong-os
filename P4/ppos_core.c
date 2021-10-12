@@ -29,17 +29,17 @@ void ppos_init () {
     
     currentTask = &mainTask;
 
-    task_create(&dispatcherTask, dispatcher, NULL);
+    if (task_create(&dispatcherTask, dispatcher, NULL) == -1) {
+        perror("### Erro ao criar a tarefa dispatcher ###");
+        exit(1);
+    };
+    
 }
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
 
-    char *stack;
-
-    getcontext(&task->context);
-
-    stack = malloc (STACKSIZE); // Inicializacao do tipo context
+    char *stack = malloc (STACKSIZE); // Inicializacao do tipo context
     if (stack) {
         task->context.uc_stack.ss_sp = stack;
         task->context.uc_stack.ss_size = STACKSIZE;
@@ -50,6 +50,8 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
         return -1;
     }
 
+    getcontext(&task->context);
+    
     makecontext (&task->context, (void *)(*start_func), 1, arg);
     
     task->next = task->prev = NULL;
@@ -58,8 +60,10 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->pEstatica = task->pDinamica = 0;
 
     if (task != &dispatcherTask) {// Se nao for a tarefa dispatcher 
-        queue_append((queue_t **) &taskQueue, (queue_t *) task); // Coloca-se na fila de tarefas
-        g_userTasks++;
+        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca-se na fila de tarefas
+            fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", g_taskId);
+        else
+            g_userTasks++;
     }
     #ifdef DEBUG
         printf ("task_create: criou tarefa %d\n", task->id);
