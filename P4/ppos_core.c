@@ -102,7 +102,7 @@ void task_exit (int exitCode) {
     #endif
     
     if (currentTask != &dispatcherTask) // Se a tarefa terminada nao for a dispatcher
-        task_switch(&dispatcherTask); // Alterna a execucao para dispatcher
+        task_switch(&dispatcherTask);   // Alterna a execucao para dispatcher
     else
         task_switch(&mainTask); // Alterna a execucao para main
 }
@@ -179,7 +179,7 @@ static void dispatcher () {
             if (prevTask->status == 'T') { // Se terminada 'T' a tarefa e removida da fila
                     
                 queue_remove((queue_t **) &taskQueue, (queue_t *) prevTask);
-                free(prevTask->context.uc_stack.ss_sp);
+                free(prevTask->context.uc_stack.ss_sp); // Desaloca a pilha
                 g_userTasks--;
                 #ifdef DEBUG
                     printf ("numero de tarefas na fila %d\n", queue_size((queue_t *) taskQueue));
