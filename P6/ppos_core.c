@@ -136,7 +136,7 @@ void task_exit (int exitCode) {
     if (currentTask != &dispatcherTask) // Se a tarefa terminada nao for a dispatcher
         task_switch(&dispatcherTask); // Alterna a execucao para dispatcher
     else
-        task_switch(&mainTask); // Alterna a execucao para main
+        task_switch(&mainTask); // Alterna a execucao para main 
 }
 
 // Retorna o identificador da tarefa corrente (main deve ser 0)
@@ -262,7 +262,7 @@ static void set_timer () {
 static void tratador () {
 
     g_clock++;
-    if (currentTask->taskType == SYSTEM)
+    if (currentTask->taskType == SYSTEM) // Se for tarefa de sistema retorna
         return;
     g_taskTime--;
     if (g_taskTime == 0)
