@@ -82,7 +82,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->activations = 0;
 
     if (task != &dispatcherTask) { // Se nao for a tarefa dispatcher 
-        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca-se na fila de tarefas
+        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca task na fila de tarefas
             fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", g_taskId);
         else
             g_userTasks++;
@@ -124,8 +124,9 @@ int task_switch (task_t *task) {
 void task_exit (int exitCode) {
 
     currentTask->status = 'T'; // Status da tarefa terminada
-    currentTask->eTime = (systime () - currentTask->eTime); // Calcula o tempo de execucao da tarefa
     currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
+    currentTask->eTime = (systime () - currentTask->eTime); // Calcula o tempo de execucao da tarefa
+    
     printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->activations);
     
     #ifdef DEBUG
@@ -157,6 +158,11 @@ void task_setprio (task_t *task, int prio) {
 
     if (!task)
         task = currentTask;
+
+    #ifdef DEBUG
+        printf("task_setprio: trocando a prioridade da tarefa %d de %d -> %d\n", task->id, task->pEstatica, prio);
+    #endif
+
     if (prio > MIN_PRIO) // Se prio for menor que o limite inferior
         task->pEstatica = task->pDinamica = MIN_PRIO;
     else if (prio < MAX_PRIO) // Se prio for maior que o limite superior

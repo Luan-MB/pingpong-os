@@ -47,7 +47,7 @@ void ppos_init () {
     mainTask.pTime = 0;
     mainTask.joinQueue = NULL;
     
-    // Insere na fila de tarefas prontas
+    // Insere main na fila de tarefas prontas
     if (queue_append((queue_t **) &taskQueue, (queue_t *) &mainTask) == 1) { // Se der erro aborta-se o programa
         fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", mainTask.id);
         exit(1);
@@ -95,7 +95,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->joinQueue = NULL;
 
     if (task != &dispatcherTask) { // Se nao for a tarefa dispatcher 
-        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca-se na fila de tarefas
+        if (queue_append((queue_t **) &taskQueue, (queue_t *) task) == 1) // Coloca task na fila de tarefas
             fprintf(stderr,"### Erro ao inserir a tarefa %d em taskQueue ###\n", task->id);
         else
             g_userTasks++;
@@ -141,9 +141,10 @@ void task_exit (int exitCode) {
     #endif
     
     currentTask->status = 'T'; // Status da tarefa terminada
+    currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
     currentTask->exitCode = exitCode;
     currentTask->eTime = (systime () - currentTask->eTime); // Calcula o tempo de execucao da tarefa
-    currentTask->pTime += (systime() - g_taskActivTime); // Calcula o tempo de processador da tarefa encerrada
+    
     printf("task %d exit: Execution time: %d ms, processor time: %d ms, activations: %d\n",currentTask->id,currentTask->eTime,currentTask->pTime,currentTask->activations);
 
     queue_t *aux;
@@ -155,7 +156,7 @@ void task_exit (int exitCode) {
     if (currentTask != &dispatcherTask) // Se a tarefa terminada nao for a dispatcher
         task_switch(&dispatcherTask); // Alterna a execucao para dispatcher
     else
-        task_switch(&mainTask); // Alterna a execucao para main
+        exit(0); // Se for o dispatcher encerra o programa
 }
 
 // Retorna o identificador da tarefa corrente (main deve ser 0)
@@ -177,6 +178,11 @@ void task_setprio (task_t *task, int prio) {
 
     if (!task)
         task = currentTask;
+
+    #ifdef DEBUG
+        printf("task_setprio: trocando a prioridade da tarefa %d de %d -> %d\n", task->id, task->pEstatica, prio);
+    #endif
+
     if (prio > MIN_PRIO) // Se prio for menor que o limite inferior
         task->pEstatica = task->pDinamica = MIN_PRIO;
     else if (prio < MAX_PRIO) // Se prio for maior que o limite superior
@@ -255,7 +261,7 @@ static void dispatcher () {
         
     }
     
-    task_exit(0); // Devolve o processador a main
+    task_exit(0);
 }
 
 static void set_timer () {
