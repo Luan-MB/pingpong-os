@@ -12,10 +12,11 @@
 #define TA_ALFA -1   // Fator de aging
 #define MAX_PRIO -20 // Maior prioridade
 #define MIN_PRIO 20  // Menor prioridade
-#define QUANTUM 10   // Ticks por quantum
+#define QUANTUM 20   // Ticks por quantum
 
-task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
-int g_taskId = 0, g_userTasks = 0, g_taskTime;
+task_t *currentTask, *prevTask, *taskQueue, *sleepingQueue;
+task_t  mainTask, dispatcherTask;
+int g_taskId = 0, g_userTasks = 0, g_taskTime, g_nextWakeUp;
 unsigned int g_clock = 0, g_taskActivTime = 0;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
@@ -24,10 +25,11 @@ struct sigaction action ;
 // estrutura de inicialização to timer
 struct itimerval timer ;
 
-static void dispatcher (); // Funcao dispatcher
-static void set_timer ();  // Funcao que inicia o timer
-static void tratador ();   // Funcao que trata os ticks do timer
-unsigned int systime ();   // Funcao que retorna o numeros de ticks desde o inicio de timer
+static void dispatcher ();   // Funcao dispatcher
+static void set_timer ();    // Funcao que inicia o timer
+static void tratador ();     // Funcao que trata os ticks do timer
+unsigned int systime ();     // Funcao que retorna o numeros de ticks desde o inicio de timer
+unsigned int next_wakeup (); // Funcao que retorna o tempo de wakeup mais proximo
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init () {
@@ -150,6 +152,7 @@ void task_exit (int exitCode) {
     queue_t *aux;
     while ((aux = currentTask->joinQueue)) { // Enquanto houver tarefas na fila de espera
         queue_remove((queue_t **) &currentTask->joinQueue, aux);
+        aux->status = 'R';
         queue_append((queue_t **) &taskQueue, aux);
     }
     
@@ -209,6 +212,16 @@ int task_join (task_t *task) {
     queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask); // Insere a tarefa na fila de espera de task
     task_yield();
     return task->exitCode;
+}
+
+// Suspende a tarefa corrente por t milissegundos
+void task_sleep (int t) {
+
+    currentTask->status = 'S';
+    currentTask->wakeupTime = systime() + t;
+    queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);     // Retira a tarefa da fila de prontas
+    queue_append((queue_t **) &sleepingQueue, (queue_t *) currentTask); // Insere a tarefa na fila de sleeping
+    task_yield();
 }
 
 // Funcao que retorna a proxima tarefa a ser executada
@@ -304,4 +317,19 @@ static void tratador () {
 unsigned int systime () {
 
     return g_clock;
+}
+
+unsigned int next_wakeup () {
+
+    task_t *aux = sleepingQueue;
+    task_t *soonerWakeUp = aux;
+
+    if (!aux)
+        return 0;
+    
+    while ((aux = aux->next) != sleepingQueue) {
+        if (soonerWakeUp->wakeupTime > aux->wakeupTime)
+            soonerWakeUp = aux;
+    }
+    return soonerWakeUp->wakeupTime;
 }

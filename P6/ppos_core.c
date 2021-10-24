@@ -12,7 +12,7 @@
 #define TA_ALFA -1   // Fator de aging
 #define MAX_PRIO -20 // Maior prioridade
 #define MIN_PRIO 20  // Menor prioridade
-#define QUANTUM 10   // Ticks por quantum
+#define QUANTUM 20   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
