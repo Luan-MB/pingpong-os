@@ -12,7 +12,7 @@
 #define TA_ALFA -1   // Fator de aging
 #define MAX_PRIO -20 // Maior prioridade
 #define MIN_PRIO 20  // Menor prioridade
-#define QUANTUM 10   // Ticks por quantum
+#define QUANTUM 20   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue,  mainTask, dispatcherTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
@@ -202,9 +202,8 @@ int task_getprio (task_t *task) {
 // A tarefa corrente aguarda o encerramento de outra task
 int task_join (task_t *task) {
 
-    if (!task || task->status == 'T') // Se task nao existir o utiver terminado
+    if (!task || task->status == 'T') // Se task nao existir ou tiver terminado
         return -1;
-    currentTask->status = 'W'; // Troca-se o status de currentTask para esperando ('W')
     queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask); // Retira a tarefa da fila de prontas
     queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask); // Insere a tarefa na fila de espera de task
     task_yield();
@@ -261,7 +260,7 @@ static void dispatcher () {
         
     }
     
-    task_exit(task_id);
+    task_exit(1);
 }
 
 static void set_timer () {

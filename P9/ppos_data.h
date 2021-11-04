@@ -25,7 +25,7 @@ typedef struct task_t
     unsigned int activations;       // numero de ativacoes da tarefa
     queue_t *joinQueue;             // aponta para a fila de tarefas esperando o termino
     int exitCode;                   // codigo de saida da tarefa
-    unsigned int wakeupTime         // tempo em que a tarefa acoradara
+    unsigned int wakeupTime;         // tempo em que a tarefa acoradara
    // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

@@ -15,8 +15,8 @@
 #define QUANTUM 20   // Ticks por quantum
 
 task_t *currentTask, *prevTask, *taskQueue, *sleepingQueue;
-task_t  mainTask, dispatcherTask;
-int g_taskId = 0, g_userTasks = 0, g_taskTime, g_nextWakeUp;
+task_t mainTask, dispatcherTask;
+int g_taskId = 0, g_userTasks = 0, g_taskTime;
 unsigned int g_clock = 0, g_taskActivTime = 0;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
@@ -25,11 +25,10 @@ struct sigaction action ;
 // estrutura de inicialização to timer
 struct itimerval timer ;
 
-static void dispatcher ();   // Funcao dispatcher
-static void set_timer ();    // Funcao que inicia o timer
-static void tratador ();     // Funcao que trata os ticks do timer
-unsigned int systime ();     // Funcao que retorna o numeros de ticks desde o inicio de timer
-unsigned int next_wakeup (); // Funcao que retorna o tempo de wakeup mais proximo
+static void dispatcher (); // Funcao dispatcher
+static void set_timer ();  // Funcao que inicia o timer
+static void tratador ();   // Funcao que trata os ticks do timer
+unsigned int systime ();   // Funcao que retorna o numeros de ticks desde o inicio de timer
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init () {
@@ -152,7 +151,6 @@ void task_exit (int exitCode) {
     queue_t *aux;
     while ((aux = currentTask->joinQueue)) { // Enquanto houver tarefas na fila de espera
         queue_remove((queue_t **) &currentTask->joinQueue, aux);
-        aux->status = 'R';
         queue_append((queue_t **) &taskQueue, aux);
     }
     
@@ -205,9 +203,8 @@ int task_getprio (task_t *task) {
 // A tarefa corrente aguarda o encerramento de outra task
 int task_join (task_t *task) {
 
-    if (!task || task->status == 'T') // Se task nao existir o utiver terminado
+    if (!task || task->status == 'T') // Se task nao existir ou tiver terminado
         return -1;
-    currentTask->status = 'W'; // Troca-se o status de currentTask para esperando ('W')
     queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask); // Retira a tarefa da fila de prontas
     queue_append((queue_t **) &task->joinQueue, (queue_t *) currentTask); // Insere a tarefa na fila de espera de task
     task_yield();
@@ -217,10 +214,10 @@ int task_join (task_t *task) {
 // Suspende a tarefa corrente por t milissegundos
 void task_sleep (int t) {
 
+    currentTask->wakeupTime = systime () + t;
     currentTask->status = 'S';
-    currentTask->wakeupTime = systime() + t;
     queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);     // Retira a tarefa da fila de prontas
-    queue_append((queue_t **) &sleepingQueue, (queue_t *) currentTask); // Insere a tarefa na fila de sleeping
+    queue_append((queue_t **) &sleepingQueue, (queue_t *) currentTask); // Coloca na fila de tarefas suspensas
     task_yield();
 }
 
@@ -254,6 +251,25 @@ static void dispatcher () {
     task_t *nextTask;
 
     while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
+        
+        int sleepQueueSize = queue_size ((queue_t *) sleepingQueue);
+
+        if (sleepQueueSize > 0) {
+
+            task_t *aux = sleepingQueue;
+            task_t *wakingUpTask;
+
+            for (int i=0; i<sleepQueueSize; ++i) {
+                aux = aux->next;
+                if (aux->prev->wakeupTime <= systime ()) {
+                    wakingUpTask = aux->prev;
+                    queue_remove((queue_t **) &sleepingQueue, (queue_t *) wakingUpTask);
+                    queue_append((queue_t **) &taskQueue, (queue_t *) wakingUpTask);
+                    wakingUpTask->status = 'R';
+                }
+            }
+        }
+
         if ((nextTask = scheduler ())) { // Se a proxima tarefa existir
             
             nextTask->activations++;
@@ -274,7 +290,7 @@ static void dispatcher () {
         
     }
     
-    task_exit(task_id);
+    task_exit(1);
 }
 
 static void set_timer () {
@@ -317,19 +333,4 @@ static void tratador () {
 unsigned int systime () {
 
     return g_clock;
-}
-
-unsigned int next_wakeup () {
-
-    task_t *aux = sleepingQueue;
-    task_t *soonerWakeUp = aux;
-
-    if (!aux)
-        return 0;
-    
-    while ((aux = aux->next) != sleepingQueue) {
-        if (soonerWakeUp->wakeupTime > aux->wakeupTime)
-            soonerWakeUp = aux;
-    }
-    return soonerWakeUp->wakeupTime;
 }
