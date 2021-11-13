@@ -18,6 +18,7 @@ task_t *currentTask, *prevTask, *taskQueue, *sleepingQueue;
 task_t mainTask, dispatcherTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
 unsigned int g_clock = 0, g_taskActivTime = 0;
+int g_lock = 0;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -170,6 +171,10 @@ int task_id () {
 // prontas ("ready queue")
 void task_yield () {
 
+    #ifdef DEBUG
+        printf("task_yield: task %d yields\n", currentTask->id);
+    #endif
+
     dispatcherTask.activations++;
     task_switch(&dispatcherTask);
 }
@@ -214,10 +219,15 @@ int task_join (task_t *task) {
 // Suspende a tarefa corrente por t milissegundos
 void task_sleep (int t) {
 
-    currentTask->wakeupTime = systime () + t;
-    currentTask->status = 'S';
+    currentTask->wakeupTime = systime () + t; // Calcula o tempo em qua a tarefa deve acordar
+    currentTask->status = 'S';                // troca o status para suspensa
     queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);     // Retira a tarefa da fila de prontas
     queue_append((queue_t **) &sleepingQueue, (queue_t *) currentTask); // Coloca na fila de tarefas suspensas
+
+    #ifdef DEBUG
+        printf("task_sleep: tarefa %d a dormir zzzzz...\n",currentTask->id);
+    #endif
+    
     task_yield();
 }
 
@@ -249,23 +259,28 @@ static task_t *scheduler () {
 static void dispatcher () {
 
     task_t *nextTask;
+    int sleepQueueSize; 
 
     while (g_userTasks > 0) { // Enquanto existirem tarefas a serem executadas
         
-        int sleepQueueSize = queue_size ((queue_t *) sleepingQueue);
-
-        if (sleepQueueSize > 0) {
+        sleepQueueSize = queue_size ((queue_t *) sleepingQueue);
+        
+        if (sleepQueueSize > 0) { // Se existirem tarefas dormindo
 
             task_t *aux = sleepingQueue;
             task_t *wakingUpTask;
 
             for (int i=0; i<sleepQueueSize; ++i) {
                 aux = aux->next;
-                if (aux->prev->wakeupTime <= systime ()) {
+                if (aux->prev->wakeupTime <= systime ()) { // Se o tempo de acordar chegou
                     wakingUpTask = aux->prev;
-                    queue_remove((queue_t **) &sleepingQueue, (queue_t *) wakingUpTask);
-                    queue_append((queue_t **) &taskQueue, (queue_t *) wakingUpTask);
-                    wakingUpTask->status = 'R';
+                    queue_remove((queue_t **) &sleepingQueue, (queue_t *) wakingUpTask); // Retira da fila de suspensas
+                    queue_append((queue_t **) &taskQueue, (queue_t *) wakingUpTask);     // Coloca na fila de prontas
+                    wakingUpTask->status = 'R';            // Troca o status para pronta
+
+                    #ifdef DEBUG
+                        printf("task_wakeup: task %d acordou, bom dia\n",wakingUpTask->id);
+                    #endif
                 }
             }
         }
@@ -333,4 +348,102 @@ static void tratador () {
 unsigned int systime () {
 
     return g_clock;
+}
+
+static void enter_cs (int *lock)
+{
+    // atomic OR (Intel macro for GCC)
+    while (__sync_fetch_and_or (lock, 1)) ;   // busy waiting
+}
+ 
+static void leave_cs (int *lock)
+{
+    (*lock) = 0 ;
+}
+
+// Cria um semáforo com valor inicial "value"
+int sem_create (semaphore_t *s, int value) {
+    
+    if (!s)
+        return -1;
+    s->value = value;
+    s->sQueue = NULL;
+    s->semLock = 0;
+
+    #ifdef DEBUG
+        printf("sem_create: semaforo com valor %d criado\n",value);
+    #endif
+
+    return 0;
+}
+
+// Requisita o semáforo
+int sem_down (semaphore_t *s) {
+
+    if (!s)
+        return -1;
+
+    #ifdef DEBUG
+        printf("sem_down: tarefa %d solicitou sem_down\n",currentTask->id);
+    #endif
+    
+    enter_cs(&s->semLock);
+    s->value--;
+    leave_cs(&s->semLock);
+
+    if (s->value < 0) {
+        queue_remove((queue_t **) &taskQueue, (queue_t *) currentTask);
+        queue_append(&s->sQueue, (queue_t *) currentTask);
+        task_yield();
+    }
+    
+    return 0;
+}
+
+// Libera o semáforo
+int sem_up (semaphore_t *s) {
+
+    if (!s)
+        return -1;
+    #ifdef DEBUG
+        printf("sem_up: tarefa %d solicitou sem_up\n",currentTask->id);
+    #endif
+
+    enter_cs(&s->semLock);
+    s->value++;
+    
+    
+    if (s->sQueue) {
+
+        queue_t *firstElem = s->sQueue;
+
+        queue_remove(&s->sQueue, firstElem);
+        queue_append((queue_t **) &taskQueue, firstElem);
+    }
+    leave_cs(&s->semLock);
+    return 0;
+}
+
+// Destroi o semáforo, liberando as tarefas bloqueadas
+int sem_destroy (semaphore_t *s) {
+
+    if (!s)
+        return -1;
+    
+    int semQueueSize;
+
+    if ((semQueueSize = queue_size(s->sQueue)) > 0) {
+
+        queue_t *aux = s->sQueue;
+
+        for (int i=0; i<semQueueSize; ++i) {
+            queue_remove(&s->sQueue, aux);
+            queue_append((queue_t **) &taskQueue, aux);
+        }
+    }
+
+    #ifdef DEBUG
+        printf("sem_destroy: semaforo destruido\n");
+    #endif
+    return 0;
 }
