@@ -531,6 +531,7 @@ int mqueue_destroy (mqueue_t *queue) {
     if (!queue || !queue->isValid)
         return -1;
     
+    // Destroi todos os semaforos
     if (sem_destroy(&queue->bufferSem))
         return -1;
     if (sem_destroy(&queue->recvSem))
