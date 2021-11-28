@@ -30,7 +30,6 @@ typedef struct
 	task_t *disk_task_queue;
 	request_t *disk_req_queue;
   	semaphore_t disk_sem;
-	int disk_signal;
 	request_t *disk_request;
   // completar com os campos necessarios
 } disk_t ;

@@ -11,6 +11,7 @@ task_t diskManagerTask;
 task_t *currentTask;
 task_t *taskQueue, *suspendedQueue;
 disk_t disk;
+int disk_signal;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -67,7 +68,7 @@ void disk_manager() {
         // obtém o semáforo de acesso ao disco
         sem_down(&disk.disk_sem);
         // se foi acordado devido a um sinal do disco
-        if (disk.disk_signal) {
+        if (disk_signal) {
             // Reativa a tarefa que foi atendida
             task_t *servedTask = disk.disk_request->req_task;
             enable_task(servedTask);
@@ -76,7 +77,7 @@ void disk_manager() {
             queue_remove((queue_t **) &disk.disk_req_queue, (queue_t *) disk.disk_request);
             free(disk.disk_request);
 
-            disk.disk_signal = 0;
+            disk_signal = 0;
         }
         
         int disk_status = disk_cmd (DISK_CMD_STATUS, 0, 0);
@@ -109,7 +110,7 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
 
     sem_create(&disk.disk_sem, 1);
     
-    disk.disk_signal = 0;
+    disk_signal = 0;
 
     task_create(&diskManagerTask, disk_manager, NULL);
     
@@ -178,7 +179,7 @@ int disk_block_write (int block, void *buffer) {
 
 void disk_signal_handler () {
 
-    disk.disk_signal = 1;
+    disk_signal = 1;
     if (diskManagerTask.status == 'S')
         activate_disk_manager();
 }
