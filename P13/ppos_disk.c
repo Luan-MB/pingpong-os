@@ -17,6 +17,7 @@ struct sigaction action ;
 
 void disk_signal_handler();
 
+// Cria um request do tipo reqType
 static request_t *create_request(int block, void *buffer, request_type reqType) {
 
     request_t *newRequest = malloc (sizeof (request_t));
@@ -31,18 +32,32 @@ static request_t *create_request(int block, void *buffer, request_type reqType) 
     return newRequest;
 }
 
+// Suspende a tarefa task e a coloca na fila do disco
 static void suspend_task (task_t *task) {
 
     queue_remove((queue_t **) &taskQueue, (queue_t *) task);
-    queue_append((queue_t **) &suspendedQueue, (queue_t *) task);
+    queue_append((queue_t **) &disk.disk_task_queue, (queue_t *) task);
     task->status = 'S';
 }
 
+// Reativa a tarefa task e a coloca na fila de prontas
 static void enable_task (task_t *task) {
 
-    queue_remove((queue_t **) &suspendedQueue, (queue_t *) task);
+    queue_remove((queue_t **) &disk.disk_task_queue, (queue_t *) task);
     queue_append((queue_t **) &taskQueue, (queue_t *) task);
     task->status = 'R';
+}
+
+// Suspende o disk manager e o retira da fila de prontas
+static void suspend_disk_manager () {
+    queue_remove((queue_t **) &taskQueue, (queue_t *) &diskManagerTask);
+    diskManagerTask.status = 'S';
+}
+
+// Reativa o disk manager o colocando na fila de prontas
+static void activate_disk_manager () {
+    queue_append((queue_t **) &taskQueue, (queue_t *) &diskManagerTask);
+    diskManagerTask.status = 'R';
 }
 
 void disk_manager() {
@@ -53,9 +68,12 @@ void disk_manager() {
         sem_down(&disk.disk_sem);
         // se foi acordado devido a um sinal do disco
         if (disk.disk_signal) {
+            // Reativa a tarefa que foi atendida
             task_t *servedTask = disk.disk_request->req_task;
             enable_task(servedTask);
-            queue_remove((queue_t **) &disk.disk_queue, (queue_t *) disk.disk_request);
+
+            // Retira a requisicao da fila
+            queue_remove((queue_t **) &disk.disk_req_queue, (queue_t *) disk.disk_request);
             free(disk.disk_request);
 
             disk.disk_signal = 0;
@@ -63,8 +81,9 @@ void disk_manager() {
         
         int disk_status = disk_cmd (DISK_CMD_STATUS, 0, 0);
         // se o disco estiver livre e houver pedidos de E/S na fila
-        if ((disk_status == 1) && disk.disk_queue) {
-            disk.disk_request = disk.disk_queue;
+        if ((disk_status == 1) && disk.disk_req_queue) {
+            // Executa a primeira requisicao da fila
+            disk.disk_request = disk.disk_req_queue;
             if (disk.disk_request->req_type == READ)
                 disk_cmd (DISK_CMD_READ, disk.disk_request->req_block, disk.disk_request->req_buffer);
             else
@@ -73,7 +92,7 @@ void disk_manager() {
 
         sem_up(&disk.disk_sem);
 
-        suspend_task(&diskManagerTask);
+        suspend_disk_manager();
 
         task_yield ();
     }
@@ -81,12 +100,11 @@ void disk_manager() {
 
 int disk_mgr_init (int *numBlocks, int *blockSize) {
 
-    if (disk_cmd(DISK_CMD_INIT, 0, 0))
+    if (disk_cmd(DISK_CMD_INIT, 0, 0)) // Se o disco na ofoi corretamente inicializado
         return -1;
-    
-    if ((*numBlocks = disk_cmd(DISK_CMD_DISKSIZE, 0, 0)) < 0)
+    if ((*numBlocks = disk_cmd(DISK_CMD_DISKSIZE, 0, 0)) < 0) // Se numblocks e valido
         return -1;
-    if ((*blockSize = disk_cmd(DISK_CMD_BLOCKSIZE, 0, 0)) < 0)
+    if ((*blockSize = disk_cmd(DISK_CMD_BLOCKSIZE, 0, 0)) < 0) // Se blockSize e valido
         return -1;
 
     sem_create(&disk.disk_sem, 1);
@@ -95,8 +113,7 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
 
     task_create(&diskManagerTask, disk_manager, NULL);
     
-    queue_append((queue_t **) &suspendedQueue, (queue_t *) &diskManagerTask);
-    diskManagerTask.status = 'S';
+    suspend_disk_manager();
 
     // registra a ação para o sinal de SIGUSR1
     action.sa_handler = disk_signal_handler;
@@ -114,16 +131,16 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
 int disk_block_read (int block, void *buffer) {
     // obtém o semáforo de acesso ao disco
     sem_down(&disk.disk_sem);
-    // inclui o pedido na fila_disco
     
+    // Cria a requisicao
     request_t *newRequest = create_request(block, buffer, READ);
     if (!newRequest)
         return -1;
-
-    queue_append((queue_t **) &disk.disk_queue, (queue_t *) newRequest);
+    // Insere a requisicao na fila de requisicoes do disco
+    queue_append((queue_t **) &disk.disk_req_queue, (queue_t *) newRequest);
 
     if (diskManagerTask.status == 'S')
-        enable_task(&diskManagerTask);
+        activate_disk_manager();
  
     // libera semáforo de acesso ao disco
     sem_up(&disk.disk_sem);
@@ -138,16 +155,17 @@ int disk_block_read (int block, void *buffer) {
 int disk_block_write (int block, void *buffer) {
     // obtém o semáforo de acesso ao disco
     sem_down(&disk.disk_sem);
-    // inclui o pedido na fila_disco
     
+    // Cria a requisicao
     request_t *newRequest = create_request(block, buffer, WRITE);
     if (!newRequest)
         return -1;
 
-    queue_append((queue_t **) &disk.disk_queue, (queue_t *) newRequest);
+    // Insere a requisicao na fila de requisicoes do disco
+    queue_append((queue_t **) &disk.disk_req_queue, (queue_t *) newRequest);
     
     if (diskManagerTask.status == 'S')
-        enable_task(&diskManagerTask);
+        activate_disk_manager();
  
     // libera semáforo de acesso ao disco
     sem_up(&disk.disk_sem);
@@ -162,6 +180,5 @@ void disk_signal_handler () {
 
     disk.disk_signal = 1;
     if (diskManagerTask.status == 'S')
-        enable_task(&diskManagerTask);
-    
+        activate_disk_manager();
 }

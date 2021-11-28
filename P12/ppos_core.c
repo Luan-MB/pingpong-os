@@ -45,7 +45,7 @@ void ppos_init () {
     mainTask.id = g_taskId++;
     mainTask.status = 'R';
     mainTask.pDinamica = mainTask.pEstatica = 0;
-    mainTask.taskType = 1;
+    mainTask.taskType = USER;
     mainTask.eTime = systime ();
     mainTask.pTime = 0;
     mainTask.joinQueue = NULL;

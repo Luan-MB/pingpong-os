@@ -27,7 +27,8 @@ typedef struct request_t {
 
 typedef struct
 {
-	request_t *disk_queue;
+	task_t *disk_task_queue;
+	request_t *disk_req_queue;
   	semaphore_t disk_sem;
 	int disk_signal;
 	request_t *disk_request;

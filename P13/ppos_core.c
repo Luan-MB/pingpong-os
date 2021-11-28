@@ -18,7 +18,7 @@
 #define QUANTUM 20   // Ticks por quantum
 
 task_t *currentTask, *prevTask;
-task_t *taskQueue, *sleepingQueue, *suspendedQueue;
+task_t *taskQueue, *sleepingQueue;
 task_t mainTask, dispatcherTask, diskManagerTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
 unsigned int g_clock = 0, g_taskActivTime = 0;
