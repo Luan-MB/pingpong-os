@@ -418,16 +418,15 @@ int sem_up (semaphore_t *s) {
     s->value++;
     leave_cs(&s->semLock);
     
-    if (s->value >= 0) {
-        task_t *firstElem;
+    if (queue_size(s->sQueue) > 0) {
 
-        if ((firstElem = s->sQueue)) {
-            queue_remove((queue_t **) &s->sQueue, (queue_t *) firstElem);
-            queue_append((queue_t **) &taskQueue, (queue_t *) firstElem);
-            #ifdef DEBUG
-                printf("sem_up: tarefa %d retirada do semaforo\n",firstElem->id);
-            #endif
-        }
+        task_t *firstTask = (task_t *) s->sQueue;
+
+        queue_remove((queue_t **) &s->sQueue, (queue_t *) firstTask);
+        queue_append((queue_t **) &taskQueue, (queue_t *) firstTask);
+        #ifdef DEBUG
+            printf("sem_up: tarefa %d retirada do semaforo\n",firstTask->id);
+        #endif
     }
     
     return 0;
@@ -438,12 +437,12 @@ int sem_destroy (semaphore_t *s) {
 
     if (!s)
         return -1;
-    
-    task_t *aux;
 
-    while ((aux = s->sQueue)) {
-        queue_remove((queue_t **) &s->sQueue, (queue_t*) aux);
-        queue_append((queue_t **) &taskQueue, (queue_t*) aux);
+    while (queue_size(s->sQueue) > 0) {
+
+        task_t *firstTask = (task_t *) s->sQueue;
+        queue_remove((queue_t **) &s->sQueue, (queue_t*) firstTask);
+        queue_append((queue_t **) &taskQueue, (queue_t*) firstTask);
     }
 
     #ifdef DEBUG

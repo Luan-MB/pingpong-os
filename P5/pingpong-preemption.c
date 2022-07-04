@@ -1,6 +1,6 @@
 // PingPongOS - PingPong Operating System
 // Prof. Carlos A. Maziero, DINF UFPR
-// Versão 1.1 -- Julho de 2016
+// Versão 1.4 -- Janeiro de 2022
 
 // Teste da preempção por tempo
 
