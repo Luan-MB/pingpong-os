@@ -541,7 +541,6 @@ int mqueue_destroy (mqueue_t *queue) {
 
     queue->isValid = 0;
     free(queue->msgBuffer);
-    queue->msgBuffer = NULL;
 
     return 0;
 }
