@@ -10,13 +10,14 @@
 #include <stdio.h>
 
 task_t diskManagerTask;
-task_t *currentTask;
-task_t *taskQueue, *suspendedQueue;
+extern task_t *currentTask;
+extern task_t *taskQueue;
+task_t *suspendedQueue;
 disk_t disk;
 int disk_signal;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
-struct sigaction action ;
+struct sigaction action2;
 
 void disk_signal_handler();
 
@@ -119,10 +120,10 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
     suspend_disk_manager();
 
     // registra a ação para o sinal de SIGUSR1
-    action.sa_handler = disk_signal_handler;
-    sigemptyset (&action.sa_mask) ;
-    action.sa_flags = 0 ;
-    if (sigaction (SIGUSR1, &action, 0) < 0)
+    action2.sa_handler = disk_signal_handler;
+    sigemptyset (&action2.sa_mask) ;
+    action2.sa_flags = 0 ;
+    if (sigaction (SIGUSR1, &action2, 0) < 0)
     {
       perror ("Erro em sigaction: ") ;
       exit (1) ;

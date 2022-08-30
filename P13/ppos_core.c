@@ -2,7 +2,6 @@
 
 #include "ppos.h"
 #include "ppos_disk.h"
-#include "globalvars.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -19,7 +18,8 @@
 
 task_t *currentTask, *prevTask;
 task_t *taskQueue, *sleepingQueue;
-task_t mainTask, dispatcherTask, diskManagerTask;
+task_t mainTask, dispatcherTask;
+extern task_t diskManagerTask;
 int g_taskId = 0, g_userTasks = 0, g_taskTime;
 unsigned int g_clock = 0, g_taskActivTime = 0;
 

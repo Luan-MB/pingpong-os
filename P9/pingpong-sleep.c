@@ -21,7 +21,7 @@ void Body (void * arg)
    for (i=0; i<20; i++)
    {
       // sorteia tempo entre 0 e 2000 ms (2s), em saltos de 100 ms
-      timeSleep = 100 * (random() % 11) ;
+      timeSleep = 100 * (random () % 11) ;
 
       // informa o quanto vai dormir
       printf ("%5d ms: %s vai dormir %d ms\n",

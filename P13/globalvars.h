@@ -6,7 +6,7 @@
 
 extern task_t diskManagerTask;
 extern task_t *currentTask;
-extern task_t *readyQueue;
+extern task_t *taskQueue;
 
 #endif
 
